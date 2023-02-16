@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en" >
+
+<!-- Mirrored from digitonaut.com/art/easter_island/ by HTTrack Website Copier/3.x [XR&CO'2014], Thu, 16 Feb 2023 08:26:07 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=UTF-8" /><!-- /Added by HTTrack -->
+<head>
+<meta charset='utf-8'\>
+<meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'><title>Easter Island</title>
+
+  <link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+<!-- partial:index.partial.html -->
+<!--
+V4 20180924 18:10
+Easter Island v4
++camera movement
++timelapse
++moai statues
++drut minions
+
+V3 20180619 17:47
+- I upgraded to Codepen Pro to simplify the upload process and because it's awesome
+- implemented a simple particle system that runs animations in the GPU
+- added rain simulation
+- added new characters and vegetation
+What I learned compared to the last version
+-------------------------------------------
+- make peace with data duplication
+http://andrewmarsh.com/blog/2016/01/05/understanding-webgl/
+- It would have been cool to use transform feedback for the particles
+but it is not available in opengl 1
+- use interleaved buffer to reduce the data exchange between cpu and gpu.
+http://learnwebgl.brown37.net/rendering/interleaved_buffers.html
+- instead of drawing quadrilaterals composed of two triangles and therefore 6 vertices
+we could use triangle strips to draw them with 4 vertices.
+This will reduce by 2 the number of vertices for each entity.
+https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/drawArrays
+https://en.wikipedia.org/wiki/Triangle_strip
+this is a quadrilateral composed of two triangles
+0,  0,  0,
+0,  1,  0,
+1,  0,  0,
+1,  1,  0,
+0,  1,  0,
+1,  0,  0
+to draw this structure we use drawarrays
+this is a triangle stripped quad, vertices with the same position are not declared
+0,  0,  0,
+0,  1,  0,
+1,  1,  0,
+1,  0,  0
+to draw this we use an additional array that defines the vertices indices
+0,1,2,2,3,0
+through this structure we define two triangles using only 4 vertices
+and we use drawelements to draw the triangles.
+What advantage do we have to reduce the number of vertices?
+Since the properties of the entities are duplicated for each vertex,
+reducing the number of vertices means decreasing the buffer size and
+then decreasing the amount of data to be exchanged between cpu and gpu.
+an old trick was to use TRIANGLE_STRIP to draw triangles and add stops
+with degenerate triangles but I did not consider it.
+To be considered, however, the fact that drawelements works with at most two-bytes indices
+which means that it can only index geometries in a 64k range.
+This limit can be avoided by using drawRangeElements but it is part of opengl 2
+https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/drawRangeElements
+
+V2 20180515 19:48
+small corrections before the next release
+- shaders now use highp float and int precision to avoid errors on mobile (solved wrong colors and animations)
+- modified the fragment shader red detection condition to avoid pixelation on entities far from the camera.
+- fixed a small 'documentation' typo in --entity "E" - XY plane-- diagram
+- minor code fixes
+updated scene with some camera keypoints
+- use the K key to switch between keypoints
+
+V1 20180511 21:59
+First version
+-->
+
+<canvas id="c" style="width:100%;height:100%;"></canvas>
+<div id="clock"></div>
+
+<!---
+<div id="stuff">
+  <a id="help" onclick="showInfo(this)">Info</a>
+  <a id="license" onclick="showInfo(this)">License</a>
+</div>
+--->
+<div class="hidden box" id="help_box">
+
+<button onclick="hideInfo()">X</button>
+<div class="box_content">
+<h3>Info</h3>
+<pre>
+Easter island v4
+
+What is this stuff?
+A simple vanilla JS Webgl 3D scene made up of my handmade drawings.
+
+Controls
+<i>Cursor keys ; Page Up ; Page Down</i>: Camera dolly
+<i>Insert ; Delete ; Home ; End</i>: Camera rotation
+<i>J ; K ; Tap </i>: Camera keypoints
+<i>+ ; - ; Swipe right ; Swipe left </i>: Rain dance
+<i>R ; T ; Y ; U </i>: Time travel
+
+Details worthy of note
+- The page takes into account the current time and will be a little different according to the time it is loaded.
+- The simulation involves 1440 different states corresponding to the minutes of a day.
+- The "living" entities go to sleep during the night.
+- Move around the camera to see how the whole scene has been created.
+- Birds are high in the sky
+</div>
+
+</div>
+
+<div class="hidden box" id="license_box">
+
+<button onclick="hideInfo()">X</button>
+<div class="box_content">
+<h3>Easter Island</h3>
+<pre>
+
+Art assets: CC BY-NC-SA 4.0
+Software: MIT
+
+More details
+-----------------------------------
+
+Copyright (c) 2018 by Sebastian E. Garcia
+
+Assets license (images)
+-----------------------------------
+CC BY-NC-SA 4.0
+<a target="_blank" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">https://creativecommons.org/licenses/by-nc-sa/4.0/</a>
+<a target="_blank" href="https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode">https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode</a>
+
+In short: My art is mine and you can not use it for commercial purposes. You can copy and remix my art but giving me attribution and giving others the same rights on your work without restrictions.
+
+In detail:
+This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+
+You are free to:
+Share - copy and redistribute the material in any medium or format
+Adapt - remix, transform, and build upon the material
+
+Under the following terms:
+
+- Attribution - You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+- NonCommercial - You may not use the material for commercial purposes.
+- ShareAlike - If you remix, transform, or build upon the material, you must distribute your contributions under the same license as the original.
+- No additional restrictions - You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
+
+Software License (Html, Javascript)
+-----------------------------------
+MIT Licensed
+<a target="_blank" href="https://opensource.org/licenses/MIT">https://opensource.org/licenses/MIT</a>
+
+In short: Everything I know as a coder, I have learned from people better than me. Copy my code, learn from my code. Be happy.
+
+In detail:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+<pre>
+</div>
+
+</div>
+
+<!--
+V4 20180924 18:10
+Easter Island v4
++camera movement
++timelapse
++moai statues
++drut minions
+
+V3 20180619 17:47
+- I upgraded to Codepen Pro to simplify the upload process and because it's awesome
+- implemented a simple particle system that runs animations in the GPU
+- added rain simulation
+- added new characters and vegetation
+What I learned compared to the last version
+-------------------------------------------
+- make peace with data duplication
+http://andrewmarsh.com/blog/2016/01/05/understanding-webgl/
+- It would have been cool to use transform feedback for the particles
+but it is not available in opengl 1
+- use interleaved buffer to reduce the data exchange between cpu and gpu.
+http://learnwebgl.brown37.net/rendering/interleaved_buffers.html
+- instead of drawing quadrilaterals composed of two triangles and therefore 6 vertices
+we could use triangle strips to draw them with 4 vertices.
+This will reduce by 2 the number of vertices for each entity.
+https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/drawArrays
+https://en.wikipedia.org/wiki/Triangle_strip
+this is a quadrilateral composed of two triangles
+0,  0,  0,
+0,  1,  0,
+1,  0,  0,
+1,  1,  0,
+0,  1,  0,
+1,  0,  0
+to draw this structure we use drawarrays
+this is a triangle stripped quad, vertices with the same position are not declared
+0,  0,  0,
+0,  1,  0,
+1,  1,  0,
+1,  0,  0
+to draw this we use an additional array that defines the vertices indices
+0,1,2,2,3,0
+through this structure we define two triangles using only 4 vertices
+and we use drawelements to draw the triangles.
+What advantage do we have to reduce the number of vertices?
+Since the properties of the entities are duplicated for each vertex,
+reducing the number of vertices means decreasing the buffer size and
+then decreasing the amount of data to be exchanged between cpu and gpu.
+an old trick was to use TRIANGLE_STRIP to draw triangles and add stops
+with degenerate triangles but I did not consider it.
+To be considered, however, the fact that drawelements works with at most two-bytes indices
+which means that it can only index geometries in a 64k range.
+This limit can be avoided by using drawRangeElements but it is part of opengl 2
+https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/drawRangeElements
+
+V2 20180515 19:48
+small corrections before the next release
+- shaders now use highp float and int precision to avoid errors on mobile (solved wrong colors and animations)
+- modified the fragment shader red detection condition to avoid pixelation on entities far from the camera.
+- fixed a small 'documentation' typo in --entity "E" - XY plane-- diagram
+- minor code fixes
+updated scene with some camera keypoints
+- use the K key to switch between keypoints
+
+V1 20180511 21:59
+First version
+-->
+
+<script id="2d-vertex-shader-particles" type="x-shader/x-vertex">
+
+precision highp float;
+precision highp int;
+
+// vertex shader inputs:
+attribute vec3  aVertexPosition;      //these are the coordinates of the vertices -> x,y,z
+attribute vec3  aParticleInitPosition;
+attribute float aParticleVelocity;
+attribute float aParticleType;
+attribute vec3  aParticleDestination;
+attribute vec3  aParticleTranslation; //x,y,z translations are applied to each vertex to move entities around the world (Daft Punk)
+attribute float aParticleLifetime;
+attribute vec4  aParticleColor;
+
+uniform mat4 uMVMatrix; //model view matrix        -> rotations
+uniform mat4 uPMatrix;  //camera projection matrix -> perspective
+uniform vec3 uCameraTranslation; //the x, y, z coordinates of the camera are added to each vertex
+uniform float uTimeDelta;
+uniform float uDelta;
+uniform float uRainDelta;
+varying float vParticleType;
+//varying float vParticleOpacity;
+varying vec4  vParticleColor;
+varying vec3  vLightWeighting;
+
+uniform vec3 uPointLighting1Location; //the x,y,z position of our first light point
+uniform vec3 uPointLighting2Location; //the x,y,z position of our second light point
+// global ambient light
+// setting it to 1.0.1.0.1.0 we have full lighting
+// setting it to 0.0.0.0.0.0 will have light only from the point light
+uniform highp vec3 uAmbientLightColorIntensity;
+uniform highp vec3 uAmbientLightColor; //the color of the ambient light, controls the color of all sprites globally
+
+//https://stackoverflow.com/questions/12964279/whats-the-origin-of-this-glsl-rand-one-liner
+float hashRand(vec2 co){
+  return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+float hashRand(float o){
+  vec2 co=vec2(o,o);
+  return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+float hashRand(float o, float o2){
+  vec2 co=vec2(o,o2);
+  return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+void main(void){
+
+  vParticleType=aParticleType; //pass particle type to fragment
+  vec3 mumu=aParticleTranslation;
+  vParticleColor=aParticleColor;
+
+  if (aParticleType<0.9){ //raindrops
+    vParticleColor.a=0.6;
+
+    //by adding the camera y position to the particles we can fill the screen regardless of the height at which we are
+
+    float localTimeDelta=mod(uTimeDelta*aParticleVelocity,aParticleInitPosition.y); //since 0 is in the center of the screen
+    vec3 particleMovement=vec3(uCameraTranslation.x-8.0,-localTimeDelta+aParticleInitPosition.y+uCameraTranslation.y-3.0,uCameraTranslation.z-25.0);
+    gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition+aParticleTranslation+particleMovement-uCameraTranslation,1.0);
+  }
+
+  if (aParticleType>0.9 && aParticleType<1.9){ //raindrop collisions on terrain
+    float localTimeDelta=0.0;
+    float velocity=1.0;
+    if (aParticleVelocity!=0.0)
+      velocity=aParticleVelocity;
+    if (aParticleLifetime>0.0){
+      localTimeDelta=mod(uTimeDelta,1.0/velocity)/(1.0/velocity);
+    }
+
+    vec3 particleMovement=mix(aParticleInitPosition,aParticleDestination,mod(localTimeDelta,aParticleLifetime));
+    float distance=aParticleDestination.x-aParticleInitPosition.x;
+    if (distance!=0.0){
+
+      particleMovement.y=sin(mix(0.0,6.28,(particleMovement.x-aParticleInitPosition.x)/distance))/380.0;
+    }
+
+    float randValue=floor(uTimeDelta*velocity);
+    particleMovement.z=hashRand(vec2(randValue,randValue));
+    particleMovement.x=hashRand(vec2(randValue,randValue));
+    //2018-09-24 12:29:48
+    //raindrops y offset ++
+    particleMovement+=vec3(uCameraTranslation.x-8.0,0.2,uCameraTranslation.z-16.0);
+    vParticleColor.a=1.0-localTimeDelta;
+
+    gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition+aParticleTranslation+particleMovement-uCameraTranslation,1.0);
+  }
+
+  if (aParticleType>1.9 && aParticleType<2.9){ //raindrop collisions on entities
+
+    float slowNess=1.0;
+    if (aParticleVelocity!=0.0)
+      slowNess=aParticleVelocity;
+    float speedDelta=slowNess*uDelta;
+    float ms=mod(uTimeDelta,speedDelta);
+    float norm=ms/speedDelta;
+    float breathDeformLimit=aParticleLifetime;
+    ms=sin(norm*6.2831852)*breathDeformLimit;
+
+    vec3 entityMovement=aParticleInitPosition;
+    float particleVelocity=aParticleDestination.x;
+    float attachedEntityBehavior=aParticleDestination.y;
+    float entityIsFloatingOnWater=aParticleDestination.z;
+    float particleSpeedDelta=particleVelocity*uDelta; //float particleSpeedDelta=0.01*uDelta;
+    float particleMs=mod(uTimeDelta,particleSpeedDelta);
+    float particleNorm=particleMs/particleSpeedDelta;
+    if (attachedEntityBehavior>1.9){
+      //living being
+      entityMovement.xy-=ms;
+      entityMovement.y+=sin(particleNorm*6.2831852)*breathDeformLimit/7.5;
+    }else{
+      //vegetation
+      entityMovement.x-=ms;
+      entityMovement.y+=sin(particleNorm*6.2831852)*breathDeformLimit/8.0;
+    }
+    if (entityIsFloatingOnWater>0.9){ //add vertical movement to particle to match floating on water movement
+
+      //WIRED G9YjdnHuAK
+      float onWaterYMovementSlowness=0.3;
+      float onWaterYMovementDistance=0.05;
+      float ms2=mod(uTimeDelta,onWaterYMovementSlowness*uDelta);
+      float norm2=ms2/(onWaterYMovementSlowness*uDelta);
+      ms2=sin(norm2*6.2831852)*onWaterYMovementDistance;
+      entityMovement.y+=ms2;
+    }
+    float xTranslation=entityMovement.x;
+
+    vec3 particleMovement=vec3(xTranslation,entityMovement.y,0.0);
+
+    if (vParticleColor.a<2.0)
+      vParticleColor.a=mix(0.0,1.0-particleNorm,uRainDelta);
+    else
+      vParticleColor.a=1.0;
+
+    //add random x component, particleNorm
+    float randValue=floor(uTimeDelta/particleSpeedDelta);
+    particleMovement.x=(entityMovement.x+hashRand(vec2(randValue,randValue))/20.0)+(mix(0.0,hashRand(-randValue,randValue),particleNorm)/20.0);
+
+    gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition+aParticleTranslation+particleMovement-uCameraTranslation,1.0);
+  }
+
+  //add light to particles
+  vec3 pointLighting1ColorIntensity=vec3(1.0,1.0,1.0);//light color intensity of point light 1 (sun)
+  vec3 pointLighting2ColorIntensity=vec3(0.5,0.5,0.6);//light color intensity of point light 2 (moon) a little bluish
+  //we must determine the direction of the light:
+  vec3 vectorNormal=vec3(0.0,1.0,0.0); //in our simple geometry just consider a fixed normal
+  vec3 light1Direction = normalize(uPointLighting1Location  - aVertexPosition);
+  vec3 light2Direction = normalize(uPointLighting2Location - aVertexPosition);
+
+  float directionalLight1Weighting = max(dot(vectorNormal, light1Direction), 0.0);
+  float directionalLight2Weighting = max(dot(vectorNormal, light2Direction), 0.0);
+
+  vec3 sunWhiteLight  = pointLighting1ColorIntensity
+                        * directionalLight1Weighting; //  * uAmbientLightColor -> do not consider ambient color for rain
+  vec3 moonWhiteLight = pointLighting2ColorIntensity
+                        * directionalLight2Weighting; //  * uAmbientLightColor -> do not consider ambient color for rain
+
+  //our world has two mobile points of light in total
+  vLightWeighting = uAmbientLightColorIntensity + sunWhiteLight  * vParticleColor.xyz; //sunlight
+  vLightWeighting+= uAmbientLightColorIntensity + moonWhiteLight * vParticleColor.xyz; //moonlight
+
+}
+
+</script>
+
+<script id="2d-fragment-shader-particles" type="x-shader/x-fragment">
+precision highp float;
+precision highp int;
+varying float vParticleType;
+//varying float vParticleOpacity;
+varying vec4  vParticleColor;
+varying vec3  vLightWeighting;
+
+void main(void){
+
+  gl_FragColor = vParticleColor*vec4(vLightWeighting*2.0,1.0);
+
+}
+</script>
+
+<script id="2d-vertex-shader" type="x-shader/x-vertex">
+//proc 3d DOC {violet bold}
+//
+// 3d coordinate system used on sebastian.it
+//
+//
+//              +Y
+//               |
+//          e    |
+//         n     |
+//        a      |     XY - plane
+//       l       |
+//      p        |
+//     /         |
+//    ZY         /------------------+X
+//              /
+//             /       ZX - plane
+//            /
+//          +Z
+
+// In our world all graphic objects are represented by a quadrilateral polygon.
+// Each polygon is composed of two triangles and therefore has 6 vertices (a, b, c; d, e, f).
+// Each vertex is composed of three X,Y,Z coordinates (aX,aY,aZ, bX,bY,bZ ... fX,fY,fZ).
+//
+//   a           d    e
+//   |\          ------
+//   | \          \   |
+//   |  \          \  |
+//   |   \          \ |
+//   ------          \|
+//   b    c           f
+//
+// Each polygon has a texture assigned to the vertices of the triangles that compose it.
+// Since the texture has no depth it has only two coordinates per vertex.
+//
+// In our simplified 3d world there are two types of geometric objects:
+// - the tiles "T", which make up the terrain of the world and are considered fixed.
+// - the entities "E", which represent everything else and which are generally dynamic objects.
+//
+
+// NOTE
+// A graphical feature that differentiates between tiles and entities
+// is the method by which they are drawn. The tiles do not have any kind of
+// transparency while the entities do.
+// This distinction has a weight in webgl since it forces us to
+// manually manage the z-order when we draw objects that need alpha-blending
+// as it is necessary to disable the depth buffer by using the following statement
+// gl.depthMask (false)
+
+// The tiles make up the ground and are drawn parallel to the ZX plane,
+// entities are generally drawn parallel to the XY plane except in some cases.
+// For example, the following entities are drawn parallel to the ZX plane:
+// - water
+// - nymphaea
+//
+// Here is an "excellent" representation of what has been said:
+//               ._____.
+//               |     |
+//      ------   |  E  |
+//     /  T  /   |_____|
+//    /_____/
+//
+//
+// TEXTURES
+// ref: https://open.gl/textures
+//
+// The coordinates of the textures follow the opengl logic
+// in which the coordinates are normalized in the range 0.0-1.0
+//
+// The pixels in the texture are addressed using texture coordinates
+// during drawing operations.
+// 0,0 is conventionally the bottom-left corner
+// 1,1 is the top-right corner of the texture image
+//
+//
+// 0.0 1.0        1.0 1.0
+//    .______________.
+//    |              |
+//    |              |
+//    |              |
+//    |              |
+//    |              |
+//    |              |
+//    |______________|
+// 0.0 0.0        1.0 0.0
+//
+//
+// To avoid confusion with the X,Y coordinates of the vertices,
+// by convention the coordinates of the textures are referenced
+// with the parameters S and T.
+//
+// This is how the polygons are represented in our code:
+// Tile "T" - ZX plane
+// Since the texture follows the order of the vertices of the triangles
+// we arrange the coordinates S and T according to the current vertex:
+//
+// vertices        name  buffer_index  texture_coords  name
+// X    Y    Z                         S    T
+// 0.0  0.0  0.0   a     0, 1, 2       0.0  1.0        A
+// 0.0  0.0  1.0   b     3, 4, 5       0.0  0.0        B
+// 1.0  0.0  1.0   c     6, 7, 8       1.0  0.0        C
+//
+// 0.0  0.0  0.0   d     9,10,11       0.0  1.0        D
+// 1.0  0.0  0.0   e     12,13,14      1.0  1.0        E
+// 1.0  0.0  1.0   f     15,16,17      1.0  0.0        F
+//
+//
+//              +Y
+//               |
+//          e    |
+//         n     |
+//        a      |
+//       l       |
+//      p        |
+//     /         |
+//    ZY       aA,dD---------eE----+X
+//              /\          /
+//             /  \        /
+//            /    \      /
+//           /      \    /
+//          /        \  /
+//         /__________\/
+//        /bB        cC,fF
+//       /
+//     +Z
+//
+//
+//entity "E" - XY plane
+//
+// vertices        name  buffer_index  texture_coords  name
+// X    Y    Z                         S    T
+// 0.0  1.0  0.0   a     0, 1, 2       0.0  1.0        A
+// 0.0  0.0  0.0   b     3, 4, 5       0.0  0.0        B
+// 1.0  0.0  0.0   c     6, 7, 8       1.0  0.0        C
+//
+// 0.0  1.0  0.0   d     9,10,11       0.0  1.0        D
+// 1.0  1.0  0.0   e     12,13,14      1.0  1.0        E
+// 1.0  0.0  0.0   f     15,16,17      1.0  0.0        F
+//
+//
+//              +Y
+//               |
+//              aA,dD--------eE
+//               |\          |
+//               | \         |
+//               |  \        |
+//               |   \       |
+//               |    \      |
+//          e    |     \     |
+//         n     |      \    |
+//        a      |       \   |
+//       l       |        \  |
+//      p        |         \ |
+//     /         |          \|
+//    ZY       bB-----------cC,fF-----+X
+//              /
+//             /
+//            /
+//           /
+//          /
+//        +Z
+//
+//
+// and I would say that for today I have done enough ASCII art.
+//
+//
+//
+//--------------------------------------------------------------------------
+
+//For our simple world lowp precision is enough
+//2018-05-15 16:27:53, switching to highp for full compatibility.
+//lowp is good for desktop but leads to numeric approximation errors on mobile browsers.
+
+precision highp float;
+precision highp int;
+
+// vertex shader inputs:
+attribute vec3 aVertexPosition;    //these are the coordinates of the vertices -> x,y,z
+attribute vec2 aTextureCoord;      //s,t textures coords for each vertext
+attribute vec3 aEntityTranslation; //x,y,z translations are applied to each vertex to move entities around the world (Daft Punk)
+attribute vec4 aEntityColor;       //r,g,b,a colors for every vertex
+
+attribute vec4 aEntityProperties;
+// [0]=entity current texture normalized x0 coordinate (used for x fliping)
+// [1]=texture_atlas_layer_index
+// [2]=entity current texture normalized x1 coordinate (used for x fliping)
+// since apparently openl gl 3.0 is required for bitwise operations ....
+// [3]=poor man's fast bitwise -> 'packed' combined mutual exclusive properties
+//     bool hasShadowMitigation (generally clouds and other types of objects in the sky)
+//     bool isLightEmitter (sun, moon)
+//     bool isFlippedX  (flip entity around y axis)
+
+uniform mat4  uMVMatrix; //model view matrix        -> rotations
+uniform mat4  uPMatrix;  //camera projection matrix -> perspective
+
+uniform vec3 uCameraTranslation; //the x, y, z coordinates of the camera are added to each vertex
+
+uniform vec3 uPointLighting1Location; //the x,y,z position of our first light point
+uniform vec3 uPointLighting2Location; //the x,y,z position of our second light point
+
+// global ambient light
+// setting it to 1.0.1.0.1.0 we have full lighting
+// setting it to 0.0.0.0.0.0 will have light only from the point light
+uniform highp vec3 uAmbientLightColorIntensity;
+uniform highp vec3 uAmbientLightColor; //the color of the ambient light, controls the color of all sprites globally
+
+varying vec2  vTextureCoord;
+varying vec3  vLightWeighting;
+varying vec3  vLightWeightingWhiteLight;
+varying float vTextureAlpha;
+varying float vTextureLayerIndex;
+
+void main(void){
+
+  vec3 pointLighting1ColorIntensity=vec3(1.0,1.0,1.0);//light color intensity of point light 1 (sun)
+  vec3 pointLighting2ColorIntensity=vec3(0.5,0.5,0.6);//light color intensity of point light 2 (moon) a little bluish
+
+  gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition+aEntityTranslation-uCameraTranslation,1.0);
+  vTextureCoord = aTextureCoord;
+
+  vTextureAlpha       =aEntityColor.a;
+  vTextureLayerIndex  =aEntityProperties[1];
+  float combinedProperties=aEntityProperties[3];
+                           //1
+  bool hasShadowMitigation=((combinedProperties>0.9 && combinedProperties<1.9)); //clouds
+                           //10
+  bool isLightEmitter     =(combinedProperties>9.9 && combinedProperties<10.9);  //stars and satellites
+                           //20
+  bool isFlippedX         =(combinedProperties>19.9);                            //entities
+
+  if (isFlippedX){
+    //aEntityProperties receives at aEntityProperties[0]
+    //the normalized x coordinate of the texture from the texture atlas
+    //and aEntityProperties[0] the normalized x1 coordinates (x + width) of the texture
+    vTextureCoord.x = aEntityProperties[2]-aTextureCoord.x+aEntityProperties[0];
+  }
+
+  vec3 pointLighting1Location=uPointLighting1Location;
+  vec3 pointLighting2Location=uPointLighting2Location;
+  if (hasShadowMitigation){
+    //Let's raise the light for the current entity more than the rest,
+    //this allows us to have illuminated objects on the sky while the others are not
+    pointLighting1Location[1]+=100.0;  //sun light
+    pointLighting2Location[1]+=20.0;   //moon light
+  }
+
+  if (!isLightEmitter){
+    //the entity does not emit its own light
+
+    //we must determine the direction of the light:
+    vec3 vectorNormal=vec3(0.0,1.0,0.0); //in our simple geometry just consider a fixed normal
+    vec3 light1Direction = normalize(pointLighting1Location - aEntityTranslation - aVertexPosition);
+    vec3 light2Direction = normalize(pointLighting2Location - aEntityTranslation - aVertexPosition);
+
+    float directionalLight1Weighting = max(dot(vectorNormal, light1Direction), 0.0);
+    float directionalLight2Weighting = max(dot(vectorNormal, light2Direction), 0.0);
+
+    vec3 sunWhiteLight  = pointLighting1ColorIntensity
+                          * directionalLight1Weighting * (uAmbientLightColor+0.1);
+    //+0.1 explained ->
+    //give a little shove to the color to have white <-> #fffff during zenith
+
+    vec3 moonWhiteLight = pointLighting2ColorIntensity
+                          * directionalLight2Weighting * uAmbientLightColor;
+
+    //our world has two mobile points of light in total
+    vLightWeighting = uAmbientLightColorIntensity + sunWhiteLight  * aEntityColor.xyz; //sunlight
+    vLightWeighting+= uAmbientLightColorIntensity + moonWhiteLight * aEntityColor.xyz; //moonlight
+
+    //----
+    //we repeat the above calculations but without taking into
+    //account the color of the entity. This will give us a white
+    //light that we can use to manage the 'neutral' pixels of
+    //the entity in the fragment shader that will not have
+    //to undergo color alterations (such as the eyes).
+
+    vLightWeightingWhiteLight = uAmbientLightColorIntensity + sunWhiteLight;
+    vLightWeightingWhiteLight+= uAmbientLightColorIntensity + moonWhiteLight;
+
+  }else{
+    //if the entity emits light do not apply color variation
+    vLightWeighting=vec3(1.0,1.0,1.0);
+  }
+
+}
+</script>
+
+<script id="2d-fragment-shader" type="x-shader/x-fragment">
+precision highp float;
+precision highp int;
+
+//our textures
+//instead of using a texture array that requires an extension
+//we select the texture atlas layer by using a variable.
+//It is not the most efficient thing in the world but it works
+//and for our little world is enough.
+//about tiling+texture atlas
+//----
+//the texture bleeding phenomenon is 'solved'
+//by an appropriate drawing method during the texture atlas generation
+
+uniform sampler2D uTextureSampler0; //ref: https://www.khronos.org/opengl/wiki/Sampler_(GLSL)
+uniform sampler2D uTextureSampler1;
+uniform sampler2D uTextureSampler2;
+uniform sampler2D uTextureSampler3;
+uniform sampler2D uTextureSampler4;
+uniform sampler2D uTextureSampler5;
+uniform sampler2D uTextureSampler6;
+uniform sampler2D uTextureSampler7;
+//2018-04-02 15:54:41 - in the tests I did on mobile it seems that there are problems beyond the 8 textures
+
+//the texCoords passed in from the vertex shader.
+//gluniform doc -> ref: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glUniform.xhtml
+varying vec2  vTextureCoord;
+varying vec3  vLightWeighting;
+varying vec3  vLightWeightingWhiteLight;
+varying float vTextureAlpha;
+varying float vTextureLayerIndex;
+uniform float uRainDelta;
+//float rainDelta=1.0;
+
+void main(void){
+
+  vec4 color;
+
+  // We use a float range to determine the layer
+  // and not a specific number to allow correct management on mobile browsers
+
+  if (vTextureLayerIndex==0.0)                               //select atlas 0
+    color=texture2D(uTextureSampler0,vec2(vTextureCoord.s,vTextureCoord.t));
+  else if (vTextureLayerIndex>0.9 && vTextureLayerIndex<1.9) //atlas 1
+    color=texture2D(uTextureSampler1,vec2(vTextureCoord.s,vTextureCoord.t));
+  else if (vTextureLayerIndex>1.9 && vTextureLayerIndex<2.9) //atlas 2
+    color=texture2D(uTextureSampler2,vec2(vTextureCoord.s,vTextureCoord.t));
+  else if (vTextureLayerIndex>2.9 && vTextureLayerIndex<3.9) //atlas 3
+    color=texture2D(uTextureSampler3,vec2(vTextureCoord.s,vTextureCoord.t));
+  else if (vTextureLayerIndex>3.9 && vTextureLayerIndex<4.9) //atlas 4
+    color=texture2D(uTextureSampler4,vec2(vTextureCoord.s,vTextureCoord.t));
+  else if (vTextureLayerIndex>4.9 && vTextureLayerIndex<5.9) //atlas 5
+    color=texture2D(uTextureSampler5,vec2(vTextureCoord.s,vTextureCoord.t));
+  else if (vTextureLayerIndex>5.9 && vTextureLayerIndex<6.9) //atlas 6
+    color=texture2D(uTextureSampler6,vec2(vTextureCoord.s,vTextureCoord.t));
+  else if (vTextureLayerIndex>6.9 && vTextureLayerIndex<7.9) //atlas 7
+    color=texture2D(uTextureSampler7,vec2(vTextureCoord.s,vTextureCoord.t));
+
+  vec3 LightWeighting;
+  vec3 fragColor;
+
+  //2018-05-04 15:39:04
+  //with the following IF we choose the RED color (used as a mask) in a fairly aprox way,
+  // We use a color mask to be able to color the eyes of the entities with white light
+  // and the rest of the body with the color of the sprite
+  if (color.r>.1 && color.g<.05 && color.b<.05){
+    float resetRed=color.r+color.g+color.b;
+    vec3  colorGray=vec3(resetRed,resetRed,resetRed);
+    fragColor=colorGray.rgb;
+    LightWeighting=vLightWeightingWhiteLight;
+    //gl_FragColor = vec4(colorGray.rgb*vLightWeightingWhiteLight,vTextureAlpha*color.a);
+  }else{
+
+    fragColor=color.rgb;
+    LightWeighting=vLightWeighting;
+
+  }
+
+  if (uRainDelta>0.0){
+    //fade light color
+    float gray=(LightWeighting.r+LightWeighting.g+LightWeighting.b)/3.0;
+    float r=mix(LightWeighting.r,gray,uRainDelta);
+    float g=mix(LightWeighting.g,gray,uRainDelta);
+    float b=mix(LightWeighting.b,gray,uRainDelta);
+    LightWeighting=vec3(r,g,b);
+
+    //fade entity color
+    gray=(fragColor.r+fragColor.g+fragColor.b)/3.0;
+    r=mix(fragColor.r,gray,uRainDelta);
+    g=mix(fragColor.g,gray,uRainDelta);
+    b=mix(fragColor.b,gray,uRainDelta);
+    fragColor=vec3(r,g,b);
+  }
+
+  gl_FragColor = vec4(fragColor*LightWeighting,vTextureAlpha*color.a);
+
+}
+</script>
+<!-- partial -->
+<script src='sebastian.glmatrix.js'></script>
+<script  src="script.js"></script>
+</body>
+
+<!-- Mirrored from digitonaut.com/art/easter_island/ by HTTrack Website Copier/3.x [XR&CO'2014], Thu, 16 Feb 2023 08:26:11 GMT -->
+</html>

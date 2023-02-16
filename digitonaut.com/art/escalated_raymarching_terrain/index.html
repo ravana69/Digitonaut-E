@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Mirrored from digitonaut.com/art/escalated_raymarching_terrain/ by HTTrack Website Copier/3.x [XR&CO'2014], Thu, 16 Feb 2023 08:26:24 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=UTF-8" /><!-- /Added by HTTrack -->
+<head>
+<meta charset='utf-8'\>
+<meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'><title>Escalated Raymarching Terrain</title>
+
+<script src="shader-web-background.min.js"></script>
+
+<script type="x-shader/x-fragment" id="Image">
+precision highp float;
+uniform vec2  iResolution;
+uniform float iTime;
+
+// -------------------------------------------------------------------------------------------------- Paste your Shadertoy code here:
+mat2 m=mat2(.8,-.6,.6,.8);
+
+
+float g(vec2 p){
+    float e=abs(sin(p.x+sin(p.y)));p=m*p;
+	return .1*(e+sin(p.x+sin(p.y)));
+}
+
+float n(vec2 p){
+    p*=.1;
+    float s=5.,t=.9;
+	for(int i=0;i<9;i++)
+        t-=s*g(p),s*=.4,p=m*2.1*p+t;
+    return 3.-exp(t);
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord){
+    float v=iTime*2.,u=sin(v*.1),x=.0,p=.0,o=.0;
+	vec3 r=vec3(fragCoord/iResolution.xy-1.,0),z,y;
+	for(int d=0;d<288;d++)        
+        if (p*.0002<=x)
+			z=vec3(0,-8.*g(vec2(0,v)*.1),v)+p*normalize(vec3(r.x-u,r.y*.3+.1,2)),x=z.y+n(z.xz),p+=x,o++;
+    x=n(z.xz);
+    y=normalize(vec3(n(z.xz-vec2(.01,0))-x,0,n(z.xz-vec2(0,.01))-x-n(z.zx*11.)*.002));
+    fragColor.xyz=dot(vec3(-.5),y)*n(z.zx*6.)*vec3(.1,.2,.3)+.1+o*.002+log(p)*.1;
+}
+
+// -------------------------------------------------------------------------------------------------- End of Shadertoy code
+
+
+void main() {
+mainImage(gl_FragColor, gl_FragCoord.xy);
+}
+</script>
+<script>
+shaderWebBackground.shade({
+	shaders: {
+		Image: {
+			uniforms: {
+				iResolution: (gl, loc, ctx) => gl.uniform2f(loc, ctx.width, ctx.height),
+				iTime: (gl, loc) => gl.uniform1f(loc, performance.now() / 1000)
+			}
+		}
+	}
+});
+</script>
+</head>
+<body>
+</body>
+
+<!-- Mirrored from digitonaut.com/art/escalated_raymarching_terrain/ by HTTrack Website Copier/3.x [XR&CO'2014], Thu, 16 Feb 2023 08:26:24 GMT -->
+</html>
